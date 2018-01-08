@@ -1,0 +1,1 @@
+"D:\text\Delphi Functions\SlinkyCrypter\ResHack\RS.exe" -addoverwrite "D:\text\Delphi Functions\SlinkyCrypter\test.exe", "D:\text\Delphi Functions\SlinkyCrypter\test.exe", "D:\text\Delphi Functions\SlinkyCrypter\Icons\Deleket-Malware-Radioactive.ico", ICONGROUP, MAINICON, 2057

